@@ -20,214 +20,46 @@ TaskNexApp.use(express());
 
 
 TaskNexApp.get('/',(req,res)=>{
-    res.send("Welcome to TaskNex by EA, Yeji and Victor")
+    res.send("Welcome to Oak Ranch Farm")
 })
 
-//return all Tasks
-TaskNexApp.get('/getEventIdeas', (req,res)=> {
-    let query = {};
-    console.log(req.query.id)
-    if(req.query.id){
-        query={_id:(req.query.id)}
+// --- ROUTES ---
+
+// 1. GET ALL PRODUCE
+TaskNexApp.get('/api/produce', async (req, res) => {
+    try {
+        const result = await db.collection('produce').find().toArray();
+        res.status(200).json(result);
+    } catch (err) {
+        res.status(500).send("Error fetching harvest data");
     }
-//return EventIdeas wrt userId
-    else if(req.query.user){
-        let user = (req.query.user)
-        query={userId:(user)}
+});
+
+// 2. GET SINGLE PRODUCT BY ID
+TaskNexApp.get('/api/produce/:id', async (req, res) => {
+    try {
+        const id = req.params.id;
+        if (!ObjectId.isValid(id)) return res.status(400).send("Invalid ID format");
+
+        const result = await db.collection('produce').findOne({ _id: new ObjectId(id) });
+        if (!result) return res.status(404).send("Product not found");
+        res.status(200).json(result);
+    } catch (err) {
+        res.status(500).send("Error fetching product details");
     }
+});
 
-//return EventIdeas wrt department
-    else if (req.query.userDept){
-        let userDept=(req.query.userDept)
-        query={'department':(userDept)}
+// 3. GET TRACEABILITY DATA
+TaskNexApp.get('/api/trace/:id', async (req, res) => {
+    try {
+        const serial = req.params.id;
+        const batch = await db.collection('batches').findOne({ serialNumber: serial });
+        if (!batch) return res.status(404).json({ message: "Serial number not found." });
+        res.json(batch);
+    } catch (err) {
+        res.status(500).json({ message: "Internal Server Error" });
     }
-
-    db.collection('eventsideas').find(query).toArray((err,result) => {
-        if(err) throw err;
-        res.send(result)
-    })
-})
-
-//return all Claims
-TaskNexApp.get('/getClaims', (req,res)=> {
-    let query = {};
-    console.log(req.query.id)
-    if(req.query.id){
-        query={_id:(req.query.id)}
-    }
-//return Claims wrt userId
-    else if(req.query.userClaims){
-        let  userClaims = (req.query.userClaims)
-        query={userId:(userClaims)}
-    }
-
-//return Claims wrt department
-    else if (req.query.claimsByDept){
-        let claimsByDept=(req.query.claimsByDept)
-        query={'department':(claimsByDept)}
-    }
-
-    db.collection('claims').find(query).toArray((err,result) => {
-        if(err) throw err;
-        res.send(result)
-    })
-})
-
-// Create a event
-TaskNexApp.post('/insertEvent',(req,res)=>{
-	console.log(req.body);
-	db.collection('eventsideas').insertOne(req.body,(err,result)=>{
-		if(err) throw err;
-		res.send("A new event was created", result);
-	})
-})
-
-// Create an Expense Claim
-TaskNexApp.post('/expenseClaim',(req,res)=>{
-	console.log(req.body);
-	db.collection('claims').insertOne(req.body,(err,result)=>{
-		if(err) throw err;
-		res.send("A new event was created", result);
-	})
-})
-
-
-//Edit a user's event
-TaskNexApp.put('/editEvent/:id',(req,res)=>{
-    console.log(req.params.id);
-    let id = (req.params.id)
-    db.collection('eventsideas').updateOne(
-        {_id:id},
-        {
-            $set: {
-                title:req.body.title,
-                short_desc:req.body.short_desc,
-                details:req.body.details,
-                submitted_by:req.body.submitted_by,
-                submitted_at:req.body.submitted_at,
-                status:req.body.status,
-                due_date:req.body.due_date,
-                priority:req.body.priority,
-                image_urls:req.body.image_urls,
-                comments:req.body.comments,
-                last_updated:req.body.last_updated
-
-                    
-            }
-        },
-        
-    )
-    res.send('event updated')      
-  
-})
-
-
-//Edit a user's Expense Claim
-TaskNexApp.put('/editClaim/:id',(req,res)=>{
-    console.log(req.params.id);
-    let id = (req.params.id)
-    db.collection('claims').updateOne(
-        {_id:id},
-        {
-            $set: {
-                title:req.body.title,
-                short_desc:req.body.short_desc,
-                details:req.body.details,
-                submitted_by:req.body.submitted_by,
-                submitted_at:req.body.submitted_at,
-                status:req.body.status,
-                due_date:req.body.due_date,
-                priority:req.body.priority,
-                expense_amount:req.body.expense_amount,
-                comments:req.body.comments,
-                last_updated:req.body.last_updated
-
-                    
-            }
-        },
-        
-    )
-    res.send('claims updated')      
-  
-})
-
-//delete an Event
-TaskNexApp.delete('/delEvent/:id',(req,res)=>{
-    let id = req.params.id
-    db.collection('eventsideas').deleteOne(
-        {_id:id},(err,result)=>{
-        if(err) throw err;
-        res.send(result)
-    })
-})
-
-//delete a Claim
-TaskNexApp.delete('/delClaim/:id',(req,res)=>{
-    let id = req.params.id
-    db.collection('claims').deleteOne(
-        {_id:id},(err,result)=>{
-        if(err) throw err;
-        res.send(result)
-    })
-})
-
-
-// View history of status changes
-
-TaskNexApp.get('/getEventsStatusLog', (req,res)=> {
-    let query = {};
-    console.log(req.query.id)
-    if(req.query.id){
-        query={_id:(req.query.id)}
-    }
-//return events status log wrt title
-    else if(req.query.eventsRequests){
-        let eventsRequests = (req.query.eventsRequests)
-        query={title:(eventsRequests)}
-    }
-
-    db.collection('eventslogs').find(query).toArray((err,result) => {
-        if(err) throw err;
-        res.send(result)
-    })
-})
-
-TaskNexApp.get('/getClaimsStatusLog', (req,res)=> {
-    let query = {};
-    console.log(req.query.id)
-    if(req.query.id){
-        query={_id:(req.query.id)}
-    }
-//return events status log wrt title
-    else if(req.query.ClaimRequest){
-        let ClaimRequest = (req.query.ClaimRequest)
-        query={title:(ClaimRequest)}
-    }
-
-    db.collection('claimslogs').find(query).toArray((err,result) => {
-        if(err) throw err;
-        res.send(result)
-    })
-})
-
-
-// Update events status log
-TaskNexApp.post('/EventsStatusLogPost',(req,res)=>{
-	console.log(req.body);
-	db.collection('eventslogs').insertOne(req.body,(err,result)=>{
-		if(err) throw err;
-		res.send("A new log was added", result);
-	})
-})
-
-// Update claims status log
-TaskNexApp.post('/ClaimsStatusLogPost',(req,res)=>{
-	console.log(req.body);
-	db.collection('claimslogs').insertOne(req.body,(err,result)=>{
-		if(err) throw err;
-		res.send("A new log was added", result);
-	})
-})
+});
 
 
 MongoClient.connect(MongoOnline, (err, client) => {
