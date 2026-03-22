@@ -1,13 +1,12 @@
 const express = require('express');
 const TaskNexApp = express();
 const dotenv = require('dotenv');
-const mongo = require('mongodb');
-const MongoClient = mongo.MongoClient;
-dotenv.config();
-const MongoOnline = process.env.MongoOnline;
+const { MongoClient, ObjectId } = require('mongodb');
 const cors = require('cors')
 const bodyparser = require('body-parser');
-const res = require('express/lib/response');
+
+dotenv.config();
+const MongoOnline = process.env.MongoOnline;
 const port = process.env.PORT || 1111;
 let db;
 
@@ -16,7 +15,7 @@ let db;
 TaskNexApp.use(bodyparser.urlencoded({extended:true}));
 TaskNexApp.use(bodyparser.json());
 TaskNexApp.use(cors());
-TaskNexApp.use(express());
+
 
 
 TaskNexApp.get('/',(req,res)=>{
