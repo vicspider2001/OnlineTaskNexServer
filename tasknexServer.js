@@ -148,6 +148,48 @@ TaskNexApp.get('/api/reservations/all', protect, async (req, res) => {
     }
 });
 
+// GET ALL MESSAGES (Admin Only)
+TaskNexApp.get('/api/messages/all', protect, async (req, res) => {
+    try {
+        const result = await db.collection('messages')
+            .find()
+            .sort({ receivedAt: -1 }) // Newest first
+            .toArray();
+        res.status(200).json(result);
+    } catch (err) {
+        res.status(500).send("Error fetching messages");
+    }
+});
+
+// GET LOW STOCK ITEMS (Admin Only)
+TaskNexApp.get('/api/inventory/low-stock', protect, async (req, res) => {
+    try {
+        const threshold = 10; // You can change this number
+        const lowStockItems = await db.collection('produce')
+            .find({ stockQuantity: { $lt: threshold } })
+            .toArray();
+        res.status(200).json(lowStockItems);
+    } catch (err) {
+        res.status(500).send("Error fetching inventory levels");
+    }
+});
+
+// UPDATE STOCK QUANTITY
+TaskNexApp.patch('/api/inventory/:id/stock', protect, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { newQuantity } = req.body;
+        
+        await db.collection('produce').updateOne(
+            { _id: new ObjectId(id) },
+            { $set: { stockQuantity: parseInt(newQuantity) } }
+        );
+        res.status(200).send("Stock updated");
+    } catch (err) {
+        res.status(500).send("Error updating stock");
+    }
+});
+
 // 6. UPDATE RESERVATION STATUS (To mark as 'Picked Up')
 TaskNexApp.patch('/api/reservations/:id', async (req, res) => {
     try {
@@ -161,6 +203,24 @@ TaskNexApp.patch('/api/reservations/:id', async (req, res) => {
         res.status(200).send("Status updated");
     } catch (err) {
         res.status(500).send("Error updating status");
+    }
+});
+
+TaskNexApp.post('/api/contact', async (req, res) => {
+    try {
+        const { name, email, message } = req.body;
+        const newMessage = {
+            name,
+            email,
+            message,
+            receivedAt: new Date(),
+            read: false
+        };
+        
+        await db.collection('messages').insertOne(newMessage);
+        res.status(201).send("Message recorded");
+    } catch (err) {
+        res.status(500).send("Server Error");
     }
 });
 
