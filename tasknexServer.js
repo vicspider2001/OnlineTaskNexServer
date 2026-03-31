@@ -6,12 +6,32 @@ const cors = require('cors')
 const bodyparser = require('body-parser');
 const jwt = require('jsonwebtoken');
 
+// --- NEW IMPORTS FOR CLOUDINARY ---
+const cloudinary = require('cloudinary').v2;
+const { CloudinaryStorage } = require('multer-storage-cloudinary');
+const multer = require('multer');
+
 dotenv.config();
 const MongoOnline = process.env.MongoOnline;
 const port = process.env.PORT || 1111;
 let db;
 
+// --- CLOUDINARY CONFIGURATION ---
+cloudinary.config({ 
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME, 
+    api_key: process.env.CLOUDINARY_API_KEY, 
+    api_secret: process.env.CLOUDINARY_API_SECRET 
+});
 
+const storage = new CloudinaryStorage({
+    cloudinary: cloudinary,
+    params: {
+      folder: 'farm_inventory', 
+      allowed_formats: ['jpg', 'png', 'jpeg', 'webp'],
+    },
+  });
+
+const upload = multer({ storage: storage });
 
 TaskNexApp.use(bodyparser.urlencoded({extended:true}));
 TaskNexApp.use(bodyparser.json());
@@ -221,6 +241,88 @@ TaskNexApp.post('/api/contact', async (req, res) => {
         res.status(201).send("Message recorded");
     } catch (err) {
         res.status(500).send("Server Error");
+    }
+});
+
+// 1. GET ALL CATEGORIES
+TaskNexApp.get('/api/categories', async (req, res) => {
+    try {
+        const categories = await db.collection('categories').find().toArray();
+        res.status(200).json(categories);
+    } catch (err) {
+        res.status(500).send("Error fetching categories");
+    }
+});
+
+// 2. ADD NEW CATEGORY (Admin Only)
+TaskNexApp.post('/api/categories/add', protect, async (req, res) => {
+    try {
+        const { name } = req.body;
+        if (!name) return res.status(400).send("Category name is required");
+        
+        const result = await db.collection('categories').insertOne({ 
+            name, 
+            createdAt: new Date() 
+        });
+        res.status(201).json(result);
+    } catch (err) {
+        res.status(500).send("Error adding category");
+    }
+});
+
+TaskNexApp.delete('/api/categories/:id', protect, async (req, res) => {
+    try {
+        const { id } = req.params;
+        await db.collection('categories').deleteOne({ _id: new ObjectId(id) });
+        res.status(200).send("Category removed");
+    } catch (err) {
+        res.status(500).send("Error deleting category");
+    }
+});
+
+// NEW HARVEST ROUTE (IMPLEMENTED HERE)
+TaskNexApp.post('/api/inventory/add', protect, upload.single('image'), async (req, res) => {
+    try {
+        const { name, category, stockQuantity, price } = req.body;
+        const newProduce = {
+            name,
+            category,
+            stockQuantity: parseInt(stockQuantity),
+            price: parseFloat(price) || 0, // Helpful to have price for new items
+            image: req.file ? req.file.path : null, 
+            createdAt: new Date()
+        };
+        const result = await db.collection('produce').insertOne(newProduce);
+        res.status(201).json({ message: "Harvest recorded successfully!", id: result.insertedId });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: "Failed to process harvest." });
+    }
+});
+
+// DELETE HARVEST & CLOUDINARY IMAGE
+TaskNexApp.delete('/api/inventory/:id', protect, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const item = await db.collection('inventory').findOne({ _id: new ObjectId(id) });
+
+        if (!item) {
+            return res.status(404).json({ message: "Harvest not found" });
+        }
+
+        // 1. Delete from Cloudinary using the public_id
+        // (Ensure you stored 'public_id' in your DB during the upload)
+        if (item.cloudinaryId) {
+            await cloudinary.uploader.destroy(item.cloudinaryId);
+        }
+
+        // 2. Delete from MongoDB
+        await db.collection('inventory').deleteOne({ _id: new ObjectId(id) });
+
+        res.status(200).json({ message: "Harvest and Cloudinary image purged." });
+    } catch (err) {
+        console.error(err);
+        res.status(500).send("Error during deletion process.");
     }
 });
 
