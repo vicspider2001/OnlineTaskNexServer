@@ -4,6 +4,7 @@ const dotenv = require('dotenv');
 const { MongoClient, ObjectId } = require('mongodb');
 const cors = require('cors')
 const bodyparser = require('body-parser');
+const jwt = require('jsonwebtoken');
 
 dotenv.config();
 const MongoOnline = process.env.MongoOnline;
@@ -107,8 +108,34 @@ TaskNexApp.post('/api/reserve', async (req, res) => {
     }
 });
 
+// 1. LOGIN ROUTE
+TaskNexApp.post('/api/neary/login', (req, res) => {
+    const { password } = req.body;
+    
+    if (password === process.env.ADMIN_PASSWORD) {
+        // Issue a token that lasts 24 hours
+        const token = jwt.sign({ role: 'admin' }, process.env.JWT_SECRET, { expiresIn: '24h' });
+        return res.json({ success: true, token });
+    }
+    
+    res.status(401).json({ success: false, message: "Incorrect Barn Key" });
+});
+
+// 2. MIDDLEWARE TO PROTECT ROUTES
+const protect = (req, res, next) => {
+    const token = req.headers.authorization?.split(' ')[1]; // Bearer <token>
+    if (!token) return res.status(403).send("Access Denied");
+
+    try {
+        jwt.verify(token, process.env.JWT_SECRET);
+        next();
+    } catch (err) {
+        res.status(401).send("Invalid Token");
+    }
+};
+
 // 5. GET ALL RESERVATIONS (For the Admin Dashboard)
-TaskNexApp.get('/api/reservations/all', async (req, res) => {
+TaskNexApp.get('/api/reservations/all', protect, async (req, res) => {
     try {
         // Sorting by pickupDate (ascending) to see the soonest ones first
         const result = await db.collection('reservations')
