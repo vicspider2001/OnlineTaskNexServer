@@ -280,22 +280,32 @@ TaskNexApp.delete('/api/categories/:id', protect, async (req, res) => {
     }
 });
 
-// NEW HARVEST ROUTE (IMPLEMENTED HERE)
+// UPDATED HARVEST ROUTE
 TaskNexApp.post('/api/inventory/add', protect, upload.single('image'), async (req, res) => {
     try {
-        const { name, category, stockQuantity, price } = req.body;
+        const { name, category, stockQuantity, price, unit, location, harvestDate, isOrganic, status, description } = req.body;
+
         const newProduce = {
             name,
             category,
             stockQuantity: parseInt(stockQuantity),
-            price: parseFloat(price) || 0, // Helpful to have price for new items
-            image: req.file ? req.file.path : null, 
+            price: parseFloat(price) || 0,
+            unit: unit || "1 lbs",
+            // Parse location if it comes as a string from FormData
+            location: location ? JSON.parse(location) : null,
+            harvestDate: harvestDate || new Date().toISOString().split('T')[0],
+            isOrganic: isOrganic === 'true' || isOrganic === true,
+            status: status || "In Season",
+            description: description || "",
+            // Multer stores the file path in req.file.path
+            imageUrl: req.file ? req.file.path : null, 
             createdAt: new Date()
         };
+
         const result = await db.collection('produce').insertOne(newProduce);
         res.status(201).json({ message: "Harvest recorded successfully!", id: result.insertedId });
     } catch (err) {
-        console.error(err);
+        console.error("Upload Error:", err);
         res.status(500).json({ error: "Failed to process harvest." });
     }
 });
